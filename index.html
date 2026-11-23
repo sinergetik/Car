@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>TEYES Style 3D Car Visualizer v5 (GPS)</title>
+  <style>
+    :root {
+      --bg: #07090d;
+      --panel: rgba(14, 18, 26, 0.9);
+      --border: rgba(255, 255, 255, 0.12);
+      --accent: #ff2a6d;
+      --accent2: #00d2ff;
+      --text: #eef2f7;
+      --muted: #8a95a5;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      gap: 10px;
+      overflow-x: hidden;
+    }
+
+    body.is-fullscreen {
+      overflow: hidden;
+    }
+
+    body.is-fullscreen .controls-panel {
+      display: none !important;
+    }
+
+    #visualizer-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      height: 320px;
+      background: #050608;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65);
+    }
+
+    #visualizer-wrap.fullscreen,
+    #visualizer-wrap:fullscreen {
+      position: fixed;
+      inset: 0;
+      max-width: none;
+      width: 100vw !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      border-radius: 0;
+      border: none;
+      z-index: 9999;
+    }
+
+    .hud-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px 14px;
+      z-index: 10;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .hud-top-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hud-badge {
+      background: rgba(8, 11, 18, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border-radius: 8px;
+      padding: 4px 9px;
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hud-badge strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .hud-fs-exit {
+      display: none;
+      pointer-events: auto;
+      appearance: none;
+      background: rgba(8, 11, 18, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #fff;
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    .hud-fs-exit:active { transform: scale(0.96); }
+
+    #visualizer-wrap.fullscreen .hud-fs-exit,
+    #visualizer-wrap:fullscreen .hud-fs-exit {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .hud-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .hud-env-btn {
+      display: none;
+      pointer-events: auto;
+      appearance: none;
+      background: rgba(8, 11, 18, 0.7);
+      border: 1px solid rgba(0, 210, 255, 0.4);
+      color: #dff8ff;
+      border-radius: 8px;
+      padding: 6px 11px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    #visualizer-wrap.fullscreen .hud-env-btn,
+    #visualizer-wrap:fullscreen .hud-env-btn {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #556070;
+    }
+    .dot.active { background: #19e68c; box-shadow: 0 0 8px #19e68c; }
+    .dot.demo { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+    .dot.gps { background: #ffb800; box-shadow: 0 0 8px #ffb800; }
+
+    .hud-speed {
+      background: rgba(8, 11, 18, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 4px 12px;
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+    }
+
+    .hud-speed-val {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      font-variant-numeric: tabular-nums;
+      color: #ffffff;
+    }
+
+    .hud-speed-unit {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .controls-panel {
+      width: 100%;
+      max-width: 640px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 20;
+    }
+
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn.primary {
+      background: rgba(0, 210, 255, 0.18);
+      border-color: rgba(0, 210, 255, 0.55);
+      color: #dff8ff;
+    }
+    .btn.accent {
+      background: rgba(255, 42, 109, 0.22);
+      border-color: rgba(255, 42, 109, 0.6);
+      color: #ffe3ec;
+    }
+    .btn.nature {
+      background: rgba(25, 210, 120, 0.18);
+      border-color: rgba(25, 210, 120, 0.55);
+      color: #d8ffea;
+    }
+    .btn.gps-on {
+      background: rgba(255, 184, 0, 0.2);
+      border-color: rgba(255, 184, 0, 0.65);
+      color: #fff2cc;
+    }
+
+    .slider-group {
+      flex: 1;
+      min-width: 170px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .slider-group input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent2);
+      height: 4px;
+    }
+
+    .slider-val {
+      min-width: 48px;
+      text-align: right;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+
+    .select-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    select {
+      background: #121722;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 5px 8px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="visualizer-wrap">
+    <div class="hud-overlay">
+      <div class="hud-top">
+        <div class="hud-badge">
+          <span class="dot" id="hud-dot"></span>
+          <span id="hud-mode">Ручной режим</span>
+        </div>
+        <div class="hud-top-right">
+          <div class="hud-badge">
+            <span>Z:</span><strong id="hud-z">0°</strong>
+            <span>X:</span><strong id="hud-x">0°</strong>
+            <span>Y:</span><strong id="hud-y">0°</strong>
+          </div>
+          <button class="hud-fs-exit" id="btn-fs-exit" title="Выйти из полного экрана">✕ Свернуть</button>
+        </div>
+      </div>
+      <div class="hud-bottom">
+        <div class="hud-speed">
+          <span class="hud-speed-val" id="hud-speed">60</span>
+          <span class="hud-speed-unit">км/ч</span>
+        </div>
+        <button class="hud-env-btn" id="btn-env-hud">Среда: Природа</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls-panel">
+    <div class="controls-row">
+      <button class="btn primary" id="btn-demo">Тест-драйв: ВЫКЛ</button>
+      <button class="btn nature" id="btn-env">Среда: Природа</button>
+      <button class="btn" id="btn-gps">GPS: ВЫКЛ</button>
+      <button class="btn" id="btn-sensors">Датчики: ВЫКЛ</button>
+      <button class="btn accent" id="btn-bump">Ямка!</button>
+      <button class="btn" id="btn-fs">Полный экран</button>
+    </div>
+
+    <div class="controls-row">
+      <div class="slider-group">
+        <span>Скорость:</span>
+        <input type="range" id="rng-speed" min="0" max="180" value="60" step="1" />
+        <span class="slider-val" id="val-speed">60 км/ч</span>
+      </div>
+      <div class="slider-group">
+        <span>Поворот (Z):</span>
+        <input type="range" id="rng-steer" min="-100" max="100" value="0" step="1" />
+        <span class="slider-val" id="val-steer">0%</span>
+      </div>
+    </div>
+
+    <div class="controls-row">
+      <div class="slider-group">
+        <span>Подъем (X):</span>
+        <input type="range" id="rng-pitch" min="-100" max="100" value="0" step="1" />
+        <span class="slider-val" id="val-pitch">0%</span>
+      </div>
+      <div class="slider-group">
+        <span>Наклон (Y):</span>
+        <input type="range" id="rng-roll" min="-100" max="100" value="0" step="1" />
+        <span class="slider-val" id="val-roll">0%</span>
+      </div>
+    </div>
+
+    <div class="controls-row">
+      <button class="btn" id="btn-invert-z">Инверсия Z: ВЫКЛ</button>
+      <button class="btn" id="btn-invert-xy">Инверсия X/Y: ВЫКЛ</button>
+      <div class="select-group">
+        <label for="sel-sens">Чувств.:</label>
+        <select id="sel-sens">
+          <option value="0.25">Очень низкая</option>
+          <option value="0.45" selected>Низкая (авто)</option>
+          <option value="0.75">Средняя</option>
+          <option value="1.1">Высокая</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
+
+  <script>
+    (function (global) {
+      'use strict';
+
+      const state = {
+        initialized: false,
+        running: false,
+        rafId: null,
+        lastTime: 0,
+
+        container: null,
+        resizeObserver: null,
+        onTelemetry: null,
+
+        scene: null,
+        camera: null,
+        renderer: null,
+        envRenderTarget: null,
+
+        // Мир и автомобиль
+        worldGroup: null,
+        carRoot: null,
+        carBodyGroup: null,
+        wheels: [],
+        tailLightMat: null,
+        brakeLightGlow: null,
+        horizonBillboard: null,
+
+        // Изгибаемая дорога и боковые поверхности (газон / тротуар)
+        roadGeo: null,
+        roadBaseX: null,
+        sideLeftGeo: null,
+        sideLeftBaseX: null,
+        sideRightGeo: null,
+        sideRightBaseX: null,
+        sideLeftMat: null,
+        sideRightMat: null,
+
+        roadTexture: null,
+        grassTexLeft: null,
+        grassTexRight: null,
+        sidewalkTexLeft: null,
+        sidewalkTexRight: null,
+        roadOffset: 0,
+
+        // Режим окружения: 'nature' | 'city'
+        envMode: 'nature',
+        natureGroup: null,
+        cityGroup: null,
+        natureProps: [],
+        cityProps: [],
+        propSpan: 112,
+
+        // Фонарные столбы справа + динамические блики
+        poles: [],
+        poleSpacing: 18,
+        poleLightA: null,
+        poleLightB: null,
+
+        // Ямки на дороге
+        potholes: [],
+        potholeTex: null,
+
+        // Скорость
+        targetSpeedKmh: 60,
+        currentSpeedKmh: 60,
+        prevSpeedKmh: 60,
+
+        // 3 оси управления (-1..1)
+        manualZ: 0,
+        manualX: 0,
+        manualY: 0,
+
+        gyroZ: 0,
+        gyroX: 0,
+        gyroY: 0,
+
+        gpsZ: 0,
+
+        curZ: 0,
+        curX: 0,
+        curY: 0,
+
+        // Подвеска
+        suspY: 0,
+        suspVel: 0,
+        suspRollKick: 0,
+        accelPitch: 0,
+        camShake: 0,
+        lastAccelZ: null,
+        lastAccelY: null,
+
+        // Датчики
+        sensorsActive: false,
+        invertZ: false,
+        invertXY: false,
+        sensitivity: 0.45,
+        motionHandler: null,
+
+        // GPS
+        gpsActive: false,
+        gpsWatchId: null,
+        gpsPrevPos: null,
+        gpsPrevHeading: null,
+        gpsPrevTime: 0,
+        gpsAccuracy: null,
+        gpsStatusCallback: null,
+
+        // Демо
+        demoMode: false,
+        demoTime: 0,
+        nextDemoBump: 2.2,
+
+        plateText: 'А583ВН',
+        plateRegion: '27'
+      };
+
+      /* ---------- Математика кривизны дороги и GPS ---------- */
+      function getRoadCurveX(z, curvature) {
+        return curvature * z * z;
+      }
+
+      function getRoadTangentAngle(z, curvature) {
+        return Math.atan(2 * curvature * z);
+      }
+
+      function haversineMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const toRad = Math.PI / 180;
+        const dLat = (lat2 - lat1) * toRad;
+        const dLon = (lon2 - lon1) * toRad;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad)
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      function calcBearingDeg(lat1, lon1, lat2, lon2) {
+        const toRad = Math.PI / 180;
+        const y = Math.sin((lon2 - lon1) * toRad) * Math.cos(lat2 * toRad);
+        const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad)
+                - Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos((lon2 - lon1) * toRad);
+        return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+      }
+
+      /* ---------- Процедурная студийно-ночная карта отражений (PMREM) ---------- */
+      function buildProceduralEnvMap(renderer) {
+        const c = document.createElement('canvas');
+        c.width = 512;
+        c.height = 256;
+        const ctx = c.getContext('2d');
+
+        const sky = ctx.createLinearGradient(0, 0, 0, 256);
+        sky.addColorStop(0.0, '#090d18');
+        sky.addColorStop(0.32, '#141e33');
+        sky.addColorStop(0.47, '#ffe7c2');
+        sky.addColorStop(0.51, '#ffffff');
+        sky.addColorStop(0.55, '#4c3e30');
+        sky.addColorStop(0.70, '#0a0e16');
+        sky.addColorStop(1.0, '#05070b');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, 512, 256);
+
+        ctx.fillStyle = 'rgba(220, 235, 255, 0.72)';
+        ctx.fillRect(40, 26, 432, 10);
+        ctx.fillStyle = 'rgba(255, 230, 185, 0.55)';
+        ctx.fillRect(90, 62, 332, 8);
+        ctx.fillStyle = 'rgba(130, 180, 255, 0.40)';
+        ctx.fillRect(20, 92, 472, 5);
+
+        const tex = new THREE.CanvasTexture(c);
+        tex.mapping = THREE.EquirectangularReflectionMapping;
+        tex.encoding = THREE.sRGBEncoding;
+
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        pmrem.compileEquirectangularShader();
+        const envRT = pmrem.fromEquirectangular(tex);
+        tex.dispose();
+        pmrem.dispose();
+        return envRT;
+      }
+
+      /* ---------- Процедурные текстуры ---------- */
+
+      function createRoadTexture() {
+        const c = document.createElement('canvas');
+        c.width = 512;
+        c.height = 512;
+        const ctx = c.getContext('2d');
+
+        const grad = ctx.createLinearGradient(0, 0, 512, 0);
+        grad.addColorStop(0.0, '#070a12');
+        grad.addColorStop(0.14, '#0e1526');
+        grad.addColorStop(0.5, '#162038');
+        grad.addColorStop(0.86, '#0e1526');
+        grad.addColorStop(1.0, '#070a12');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 512, 512);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.03)';
+        for (let i = 0; i < 650; i++) {
+          ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 5);
+        }
+
+        ctx.fillStyle = 'rgba(195, 222, 255, 0.58)';
+        ctx.fillRect(14, 0, 7, 512);
+        ctx.fillRect(491, 0, 7, 512);
+
+        ctx.fillStyle = 'rgba(185, 215, 255, 0.26)';
+        ctx.fillRect(253, 36, 6, 170);
+        ctx.fillRect(253, 292, 6, 170);
+
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(1, 14);
+        tex.anisotropy = 4;
+        return tex;
+      }
+
+      function createGrassTexture() {
+        const c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 256;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#0c1c12';
+        ctx.fillRect(0, 0, 256, 256);
+
+        for (let i = 0; i < 120; i++) {
+          const x = Math.random() * 256;
+          const y = Math.random() * 256;
+          const r = 10 + Math.random() * 24;
+          const g = ctx.createRadialGradient(x, y, 1, x, y, r);
+          const tone = Math.random() > 0.5 ? 'rgba(28, 72, 38, 0.28)' : 'rgba(12, 38, 22, 0.35)';
+          g.addColorStop(0, tone);
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = g;
+          ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        }
+
+        for (let i = 0; i < 1600; i++) {
+          ctx.fillStyle = Math.random() > 0.45 ? 'rgba(42, 102, 52, 0.34)' : 'rgba(18, 52, 28, 0.45)';
+          ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 5);
+        }
+
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(7, 24);
+        tex.anisotropy = 4;
+        return tex;
+      }
+
+      function createSidewalkTexture() {
+        const c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 256;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#151922';
+        ctx.fillRect(0, 0, 256, 256);
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.lineWidth = 2;
+        const tile = 32;
+        for (let y = 0; y <= 256; y += tile) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke();
+        }
+        for (let x = 0; x <= 256; x += tile) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke();
+        }
+
+        ctx.fillStyle = 'rgba(200, 215, 235, 0.03)';
+        for (let i = 0; i < 400; i++) {
+          ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+        }
+
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(7, 24);
+        tex.anisotropy = 4;
+        return tex;
+      }
+
+      function createBuildingFacadeTexture(accentHue) {
+        const c = document.createElement('canvas');
+        c.width = 128;
+        c.height = 256;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#111622';
+        ctx.fillRect(0, 0, 128, 256);
+
+        const cols = 4, rows = 10, padX = 10, padY = 10;
+        const winW = (128 - padX * (cols + 1)) / cols;
+        const winH = (230 - padY * (rows + 1)) / rows;
+
+        for (let r = 0; r < rows; r++) {
+          for (let col = 0; col < cols; col++) {
+            const lit = Math.random();
+            if (lit > 0.38) {
+              const warm = Math.random() > 0.35;
+              ctx.fillStyle = warm
+                ? `rgba(255, ${205 + Math.floor(Math.random() * 35)}, 135, ${0.55 + Math.random() * 0.4})`
+                : `rgba(140, 210, 255, ${0.45 + Math.random() * 0.4})`;
+            } else {
+              ctx.fillStyle = 'rgba(20, 28, 42, 0.9)';
+            }
+            ctx.fillRect(padX + col * (winW + padX), 14 + padY + r * (winH + padY), winW, winH);
+          }
+        }
+
+        ctx.fillStyle = accentHue;
+        ctx.fillRect(10, 236, 108, 8);
+        const tex = new THREE.CanvasTexture(c);
+        tex.anisotropy = 2;
+        return tex;
+      }
+
+      function createHorizonGlowTexture() {
+        const c = document.createElement('canvas');
+        c.width = 512;
+        c.height = 256;
+        const ctx = c.getContext('2d');
+        const g = ctx.createRadialGradient(256, 175, 4, 256, 175, 230);
+        g.addColorStop(0.0, 'rgba(255, 255, 250, 1.0)');
+        g.addColorStop(0.14, 'rgba(255, 240, 200, 0.85)');
+        g.addColorStop(0.35, 'rgba(220, 195, 145, 0.35)');
+        g.addColorStop(0.7, 'rgba(90, 80, 70, 0.08)');
+        g.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 512, 256);
+
+        const lineGrad = ctx.createLinearGradient(0, 172, 0, 182);
+        lineGrad.addColorStop(0, 'rgba(255,245,220,0)');
+        lineGrad.addColorStop(0.5, 'rgba(255,248,230,0.85)');
+        lineGrad.addColorStop(1, 'rgba(255,245,220,0)');
+        ctx.fillStyle = lineGrad;
+        ctx.fillRect(0, 172, 512, 10);
+        return new THREE.CanvasTexture(c);
+      }
+
+      function createStreetLightPoolTexture() {
+        const c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 256;
+        const ctx = c.getContext('2d');
+        const g = ctx.createRadialGradient(128, 128, 6, 128, 128, 124);
+        g.addColorStop(0.0, 'rgba(255, 230, 175, 0.72)');
+        g.addColorStop(0.35, 'rgba(255, 205, 130, 0.32)');
+        g.addColorStop(0.7, 'rgba(255, 185, 100, 0.08)');
+        g.addColorStop(1.0, 'rgba(255, 180, 90, 0.0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 256, 256);
+        return new THREE.CanvasTexture(c);
+      }
+
+      function createPotholeTexture() {
+        const c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 256;
+        const ctx = c.getContext('2d');
+        const rim = ctx.createRadialGradient(128, 128, 30, 128, 128, 105);
+        rim.addColorStop(0.0, 'rgba(0, 0, 0, 0.98)');
+        rim.addColorStop(0.55, 'rgba(10, 12, 16, 0.95)');
+        rim.addColorStop(0.72, 'rgba(135, 150, 175, 0.78)');
+        rim.addColorStop(0.86, 'rgba(70, 80, 95, 0.35)');
+        rim.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+        ctx.fillStyle = rim;
+
+        ctx.beginPath();
+        const pts = 14;
+        for (let i = 0; i <= pts; i++) {
+          const a = (i / pts) * Math.PI * 2;
+          const r = 82 + Math.sin(i * 3.7) * 18 + Math.cos(i * 2.1) * 12;
+          const x = 128 + Math.cos(a) * r;
+          const y = 128 + Math.sin(a) * r * 0.78;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(165, 185, 215, 0.55)';
+        ctx.lineWidth = 2;
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * Math.PI * 2 + 0.3;
+          ctx.beginPath();
+          ctx.moveTo(128 + Math.cos(a) * 65, 128 + Math.sin(a) * 52);
+          ctx.lineTo(128 + Math.cos(a + 0.12) * 108, 128 + Math.sin(a - 0.1) * 90);
+          ctx.stroke();
+        }
+        return new THREE.CanvasTexture(c);
+      }
+
+      function createContactShadowTexture() {
+        const c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 512;
+        const ctx = c.getContext('2d');
+        const g = ctx.createRadialGradient(128, 256, 30, 128, 256, 125);
+        g.addColorStop(0, 'rgba(0, 0, 0, 0.94)');
+        g.addColorStop(0.62, 'rgba(0, 0, 0, 0.58)');
+        g.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+        ctx.scale(1, 2);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 256, 256);
+        return new THREE.CanvasTexture(c);
+      }
+
+      function createHeadlightBeamTexture() {
+        const c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 512;
+        const ctx = c.getContext('2d');
+        const g = ctx.createLinearGradient(0, 512, 0, 0);
+        g.addColorStop(0.0, 'rgba(140, 205, 255, 0.56)');
+        g.addColorStop(0.35, 'rgba(100, 165, 255, 0.22)');
+        g.addColorStop(1.0, 'rgba(70, 130, 255, 0.0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(95, 512);
+        ctx.lineTo(161, 512);
+        ctx.lineTo(250, 0);
+        ctx.lineTo(6, 0);
+        ctx.closePath();
+        ctx.fill();
+        return new THREE.CanvasTexture(c);
+      }
+
+      function createLicensePlateTexture(mainText, region) {
+        const c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 64;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#edf1f6';
+        ctx.fillRect(0, 0, 256, 64);
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(3, 3, 250, 58);
+        ctx.fillStyle = '#111';
+        ctx.fillRect(184, 4, 3, 56);
+        ctx.font = 'bold 34px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(mainText, 95, 34);
+        ctx.font = 'bold 24px Arial, sans-serif';
+        ctx.fillText(region, 219, 24);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(202, 41, 34, 4);
+        ctx.fillStyle = '#0039a6'; ctx.fillRect(202, 45, 34, 4);
+        ctx.fillStyle = '#d52b1e'; ctx.fillRect(202, 49, 34, 4);
+        const tex = new THREE.CanvasTexture(c);
+        tex.anisotropy = 4;
+        return tex;
+      }
+
+      /* ---------- Лофтинг кузова ---------- */
+
+      function createLoftedGeometry(sections) {
+        const ringLen = sections[0].pts.length;
+        const positions = [];
+        const indices = [];
+
+        for (let s = 0; s < sections.length; s++) {
+          const sec = sections[s];
+          for (let p = 0; p < ringLen; p++) {
+            positions.push(sec.pts[p][0], sec.pts[p][1], sec.z);
+          }
+        }
+
+        for (let s = 0; s < sections.length - 1; s++) {
+          for (let p = 0; p < ringLen; p++) {
+            const pNext = (p + 1) % ringLen;
+            const a = s * ringLen + p;
+            const b = s * ringLen + pNext;
+            const c = (s + 1) * ringLen + pNext;
+            const d = (s + 1) * ringLen + p;
+            indices.push(a, b, c, a, c, d);
+          }
+        }
+
+        const frontCenterIdx = positions.length / 3;
+        const fSec = sections[0];
+        let fy = 0;
+        for (let p = 0; p < ringLen; p++) fy += fSec.pts[p][1];
+        positions.push(0, fy / ringLen, fSec.z);
+        for (let p = 0; p < ringLen; p++) {
+          const pNext = (p + 1) % ringLen;
+          indices.push(frontCenterIdx, pNext, p);
+        }
+
+        const backCenterIdx = positions.length / 3;
+        const bSec = sections[sections.length - 1];
+        let by = 0;
+        for (let p = 0; p < ringLen; p++) by += bSec.pts[p][1];
+        positions.push(0, by / ringLen, bSec.z);
+        const base = (sections.length - 1) * ringLen;
+        for (let p = 0; p < ringLen; p++) {
+          const pNext = (p + 1) % ringLen;
+          indices.push(backCenterIdx, base + p, base + pNext);
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setIndex(indices);
+        geo.computeVertexNormals();
+        return geo;
+      }
+
+      function makeBodyRing(wBot, wMid, wTop, yBot, yMid, yTop, crown) {
+        return [
+          [0, yBot],
+          [wBot, yBot + 0.03],
+          [wMid, yMid],
+          [wTop, yTop - 0.04],
+          [wTop * 0.55, yTop + crown * 0.7],
+          [0, yTop + crown],
+          [-wTop * 0.55, yTop + crown * 0.7],
+          [-wTop, yTop - 0.04],
+          [-wMid, yMid],
+          [-wBot, yBot + 0.03]
+        ];
+      }
+
+      /* ---------- 3D-модель автомобиля ---------- */
+
+      function buildCarModel() {
+        const carRoot = new THREE.Group();
+        const bodyGroup = new THREE.Group();
+        carRoot.add(bodyGroup);
+
+        const paintMat = new THREE.MeshPhysicalMaterial({
+          color: 0x1b2230,
+          metalness: 0.78,
+          roughness: 0.16,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.06,
+          envMapIntensity: 1.55
+        });
+
+        const glassMat = new THREE.MeshPhysicalMaterial({
+          color: 0x050810,
+          metalness: 0.92,
+          roughness: 0.04,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.03,
+          envMapIntensity: 1.9
+        });
+
+        const carbonMat = new THREE.MeshStandardMaterial({ color: 0x0b0e14, metalness: 0.4, roughness: 0.45 });
+        const darkWellMat = new THREE.MeshStandardMaterial({ color: 0x040507, roughness: 0.95, metalness: 0.05 });
+        const chromeMat = new THREE.MeshStandardMaterial({ color: 0xe6eef8, metalness: 0.96, roughness: 0.1, envMapIntensity: 1.6 });
+        const caliperMat = new THREE.MeshStandardMaterial({ color: 0xf01e3c, metalness: 0.35, roughness: 0.3 });
+        const rotorMat = new THREE.MeshStandardMaterial({ color: 0x8e99a8, metalness: 0.85, roughness: 0.32 });
+
+        const lowerSections = [
+          { z: -2.26, pts: makeBodyRing(0.68, 0.74, 0.62, 0.22, 0.36, 0.50, 0.04) },
+          { z: -2.02, pts: makeBodyRing(0.84, 0.92, 0.82, 0.20, 0.46, 0.66, 0.06) },
+          { z: -1.45, pts: makeBodyRing(0.88, 0.97, 0.88, 0.20, 0.54, 0.78, 0.05) },
+          { z: -0.78, pts: makeBodyRing(0.85, 0.93, 0.85, 0.20, 0.55, 0.84, 0.04) },
+          { z:  0.15, pts: makeBodyRing(0.86, 0.94, 0.86, 0.20, 0.56, 0.86, 0.04) },
+          { z:  1.05, pts: makeBodyRing(0.92, 1.03, 0.93, 0.21, 0.60, 0.92, 0.06) },
+          { z:  1.72, pts: makeBodyRing(0.90, 1.01, 0.90, 0.24, 0.60, 0.89, 0.05) },
+          { z:  2.14, pts: makeBodyRing(0.80, 0.91, 0.82, 0.28, 0.58, 0.83, 0.03) },
+          { z:  2.26, pts: makeBodyRing(0.72, 0.82, 0.74, 0.30, 0.54, 0.78, 0.02) }
+        ];
+        bodyGroup.add(new THREE.Mesh(createLoftedGeometry(lowerSections), paintMat));
+
+        const cabinSections = [
+          { z: -0.96, pts: makeBodyRing(0.78, 0.78, 0.72, 0.80, 0.84, 0.86, 0.02) },
+          { z: -0.42, pts: makeBodyRing(0.78, 0.74, 0.63, 0.82, 1.04, 1.24, 0.06) },
+          { z:  0.12, pts: makeBodyRing(0.79, 0.74, 0.62, 0.84, 1.08, 1.32, 0.07) },
+          { z:  0.72, pts: makeBodyRing(0.80, 0.73, 0.59, 0.85, 1.05, 1.26, 0.06) },
+          { z:  1.38, pts: makeBodyRing(0.80, 0.74, 0.60, 0.86, 0.98, 1.08, 0.04) },
+          { z:  1.92, pts: makeBodyRing(0.74, 0.70, 0.58, 0.84, 0.88, 0.91, 0.02) }
+        ];
+        bodyGroup.add(new THREE.Mesh(createLoftedGeometry(cabinSections), glassMat));
+
+        const roofSections = [
+          { z: -0.38, pts: makeBodyRing(0.58, 0.59, 0.55, 1.24, 1.26, 1.28, 0.05) },
+          { z:  0.12, pts: makeBodyRing(0.57, 0.58, 0.54, 1.31, 1.33, 1.35, 0.06) },
+          { z:  0.68, pts: makeBodyRing(0.54, 0.55, 0.50, 1.26, 1.28, 1.29, 0.05) }
+        ];
+        bodyGroup.add(new THREE.Mesh(createLoftedGeometry(roofSections), paintMat));
+
+        const spoiler = new THREE.Mesh(new THREE.BoxGeometry(1.52, 0.045, 0.22), paintMat);
+        spoiler.position.set(0, 0.88, 2.08);
+        spoiler.rotation.x = 0.22;
+        bodyGroup.add(spoiler);
+
+        const louvreGeo = new THREE.BoxGeometry(0.026, 0.022, 0.36);
+        for (let i = -7; i <= 7; i++) {
+          const slat = new THREE.Mesh(louvreGeo, i === 0 ? chromeMat : carbonMat);
+          slat.position.set(i * 0.068, 1.01, 1.56);
+          slat.rotation.x = 0.34;
+          bodyGroup.add(slat);
+        }
+
+        const tailHousing = new THREE.Mesh(new THREE.BoxGeometry(1.76, 0.11, 0.06), carbonMat);
+        tailHousing.position.set(0, 0.74, 2.21);
+        bodyGroup.add(tailHousing);
+
+        const tailLightMat = new THREE.MeshBasicMaterial({ color: 0xff2266 });
+        state.tailLightMat = tailLightMat;
+        const tailBar = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.042, 0.05), tailLightMat);
+        tailBar.position.set(0, 0.75, 2.24);
+        bodyGroup.add(tailBar);
+
+        const refMat = new THREE.MeshBasicMaterial({ color: 0x991133 });
+        [-0.64, 0.64].forEach((xPos) => {
+          const r = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.025, 0.03), refMat);
+          r.position.set(xPos, 0.44, 2.24);
+          bodyGroup.add(r);
+        });
+
+        const glowCanvas = document.createElement('canvas');
+        glowCanvas.width = 256;
+        glowCanvas.height = 64;
+        const gctx = glowCanvas.getContext('2d');
+        const gg = gctx.createRadialGradient(128, 32, 4, 128, 32, 120);
+        gg.addColorStop(0, 'rgba(255, 30, 105, 0.90)');
+        gg.addColorStop(0.5, 'rgba(255, 20, 80, 0.28)');
+        gg.addColorStop(1, 'rgba(255, 0, 60, 0)');
+        gctx.fillStyle = gg;
+        gctx.fillRect(0, 0, 256, 64);
+
+        const tailGlowPlane = new THREE.Mesh(
+          new THREE.PlaneGeometry(2.25, 0.36),
+          new THREE.MeshBasicMaterial({
+            map: new THREE.CanvasTexture(glowCanvas),
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          })
+        );
+        tailGlowPlane.position.set(0, 0.75, 2.28);
+        bodyGroup.add(tailGlowPlane);
+        state.brakeLightGlow = tailGlowPlane;
+
+        const diffuser = new THREE.Mesh(new THREE.BoxGeometry(1.56, 0.18, 0.16), carbonMat);
+        diffuser.position.set(0, 0.31, 2.18);
+        bodyGroup.add(diffuser);
+
+        const finGeo = new THREE.BoxGeometry(0.025, 0.15, 0.18);
+        [-0.36, -0.14, 0.14, 0.36].forEach((xPos) => {
+          const fin = new THREE.Mesh(finGeo, carbonMat);
+          fin.position.set(xPos, 0.29, 2.21);
+          bodyGroup.add(fin);
+        });
+
+        const exhaustOuterGeo = new THREE.CylinderGeometry(0.052, 0.052, 0.14, 16);
+        exhaustOuterGeo.rotateX(Math.PI / 2);
+        const exhaustInnerGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.15, 12);
+        exhaustInnerGeo.rotateX(Math.PI / 2);
+        [-0.62, -0.49, 0.49, 0.62].forEach((xPos) => {
+          const outer = new THREE.Mesh(exhaustOuterGeo, chromeMat);
+          outer.position.set(xPos, 0.29, 2.24);
+          bodyGroup.add(outer);
+          const inner = new THREE.Mesh(exhaustInnerGeo, darkWellMat);
+          inner.position.set(xPos, 0.29, 2.245);
+          bodyGroup.add(inner);
+        });
+
+        const plateMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.54, 0.135),
+          new THREE.MeshBasicMaterial({ map: createLicensePlateTexture(state.plateText, state.plateRegion) })
+        );
+        plateMesh.position.set(0, 0.49, 2.265);
+        bodyGroup.add(plateMesh);
+
+        const skirtGeo = new THREE.BoxGeometry(0.08, 0.07, 2.1);
+        [-0.93, 0.93].forEach((xPos) => {
+          const sk = new THREE.Mesh(skirtGeo, carbonMat);
+          sk.position.set(xPos, 0.21, -0.02);
+          bodyGroup.add(sk);
+        });
+
+        const splitter = new THREE.Mesh(new THREE.BoxGeometry(1.56, 0.045, 0.28), carbonMat);
+        splitter.position.set(0, 0.20, -2.18);
+        bodyGroup.add(splitter);
+
+        [-1, 1].forEach((side) => {
+          const stalk = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.035, 0.05), carbonMat);
+          stalk.position.set(side * 0.88, 0.90, -0.52);
+          stalk.rotation.z = side * 0.28;
+          bodyGroup.add(stalk);
+
+          const cap = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.085, 0.12), paintMat);
+          cap.position.set(side * 0.98, 0.94, -0.54);
+          cap.rotation.y = side * -0.18;
+          bodyGroup.add(cap);
+        });
+
+        const headMat = new THREE.MeshBasicMaterial({ color: 0xe6f6ff });
+        const headGeo = new THREE.BoxGeometry(0.36, 0.065, 0.14);
+        [-0.66, 0.66].forEach((xPos) => {
+          const hl = new THREE.Mesh(headGeo, headMat);
+          hl.position.set(xPos, 0.60, -2.14);
+          hl.rotation.y = xPos > 0 ? -0.32 : 0.32;
+          hl.rotation.x = 0.18;
+          bodyGroup.add(hl);
+        });
+
+        const beamMat = new THREE.MeshBasicMaterial({
+          map: createHeadlightBeamTexture(),
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          opacity: 0.72
+        });
+        [-0.58, 0.58].forEach((xPos) => {
+          const beam = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 7.8), beamMat);
+          beam.rotation.x = -Math.PI / 2;
+          beam.position.set(xPos, 0.04, -5.9);
+          bodyGroup.add(beam);
+        });
+
+        const wheelPositions = [
+          { x: -0.92, y: 0.35, z: -1.36, isFront: true },
+          { x:  0.92, y: 0.35, z: -1.36, isFront: true },
+          { x: -0.96, y: 0.37, z:  1.34, isFront: false },
+          { x:  0.96, y: 0.37, z:  1.34, isFront: false }
+        ];
+        const tireMat = new THREE.MeshStandardMaterial({ color: 0x101216, roughness: 0.84, metalness: 0.1 });
+        const rimMat = new THREE.MeshStandardMaterial({ color: 0xd2dce8, metalness: 0.92, roughness: 0.18, envMapIntensity: 1.5 });
+
+        state.wheels = [];
+        wheelPositions.forEach((wp) => {
+          const radius = wp.isFront ? 0.35 : 0.37;
+          const width = wp.isFront ? 0.25 : 0.31;
+          const sideSign = wp.x > 0 ? 1 : -1;
+
+          const wellGeo = new THREE.CylinderGeometry(radius + 0.018, radius + 0.018, width * 0.72, 16);
+          wellGeo.rotateZ(Math.PI / 2);
+          const well = new THREE.Mesh(wellGeo, darkWellMat);
+          well.position.set(wp.x * 0.82, wp.y + 0.015, wp.z);
+          bodyGroup.add(well);
+
+          const pivot = new THREE.Group();
+          pivot.position.set(wp.x, wp.y, wp.z);
+
+          const spinGroup = new THREE.Group();
+
+          const tireGeo = new THREE.CylinderGeometry(radius, radius, width, 28);
+          tireGeo.rotateZ(Math.PI / 2);
+          spinGroup.add(new THREE.Mesh(tireGeo, tireMat));
+
+          const rimOuterGeo = new THREE.CylinderGeometry(radius * 0.74, radius * 0.74, width + 0.012, 24);
+          rimOuterGeo.rotateZ(Math.PI / 2);
+          spinGroup.add(new THREE.Mesh(rimOuterGeo, rimMat));
+
+          const rimInnerGeo = new THREE.CylinderGeometry(radius * 0.66, radius * 0.66, width + 0.018, 20);
+          rimInnerGeo.rotateZ(Math.PI / 2);
+          spinGroup.add(new THREE.Mesh(rimInnerGeo, darkWellMat));
+
+          const spokeGeo = new THREE.BoxGeometry(0.032, radius * 0.65, 0.028);
+          for (let s = 0; s < 5; s++) {
+            const baseAngle = (s * Math.PI * 2) / 5;
+            [-0.14, 0.14].forEach((offset) => {
+              const sp = new THREE.Mesh(spokeGeo, rimMat);
+              const a = baseAngle + offset;
+              sp.position.set(sideSign * (width * 0.44), Math.cos(a) * radius * 0.34, Math.sin(a) * radius * 0.34);
+              sp.rotation.x = a;
+              spinGroup.add(sp);
+            });
+          }
+
+          const hubGeo = new THREE.CylinderGeometry(0.075, 0.075, width + 0.03, 14);
+          hubGeo.rotateZ(Math.PI / 2);
+          spinGroup.add(new THREE.Mesh(hubGeo, rimMat));
+
+          const rotorGeo = new THREE.CylinderGeometry(radius * 0.56, radius * 0.56, 0.04, 20);
+          rotorGeo.rotateZ(Math.PI / 2);
+          const rotor = new THREE.Mesh(rotorGeo, rotorMat);
+          rotor.position.set(sideSign * (width * 0.12), 0, 0);
+          spinGroup.add(rotor);
+
+          pivot.add(spinGroup);
+
+          const caliper = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.17, 0.13), caliperMat);
+          caliper.position.set(sideSign * (width * 0.22), 0.05, wp.isFront ? 0.15 : -0.15);
+          pivot.add(caliper);
+
+          carRoot.add(pivot);
+          state.wheels.push({ pivot, spinMesh: spinGroup, isFront: wp.isFront, radius });
+        });
+
+        const shadowPlane = new THREE.Mesh(
+          new THREE.PlaneGeometry(2.85, 5.25),
+          new THREE.MeshBasicMaterial({ map: createContactShadowTexture(), transparent: true, depthWrite: false })
+        );
+        shadowPlane.rotation.x = -Math.PI / 2;
+        shadowPlane.position.set(0, 0.02, 0.0);
+        carRoot.add(shadowPlane);
+
+        state.carRoot = carRoot;
+        state.carBodyGroup = bodyGroup;
+        return carRoot;
+      }
+
+      /* ---------- Декор: Природа и Город ---------- */
+
+      function buildNatureProps(parentGroup) {
+        const natureGroup = new THREE.Group();
+        parentGroup.add(natureGroup);
+        state.natureGroup = natureGroup;
+        state.natureProps = [];
+
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3b281c, roughness: 0.9 });
+        const pineMat1 = new THREE.MeshStandardMaterial({ color: 0x153822, roughness: 0.85 });
+        const pineMat2 = new THREE.MeshStandardMaterial({ color: 0x1d4a2c, roughness: 0.85 });
+        const bushMat = new THREE.MeshStandardMaterial({ color: 0x1e522e, roughness: 0.88 });
+
+        const trunkGeo = new THREE.CylinderGeometry(0.14, 0.22, 1.4, 6);
+        const coneBotGeo = new THREE.ConeGeometry(1.35, 2.6, 7);
+        const coneMidGeo = new THREE.ConeGeometry(1.05, 2.2, 7);
+        const coneTopGeo = new THREE.ConeGeometry(0.7, 1.7, 7);
+        const crownGeo = new THREE.DodecahedronGeometry(1.15, 0);
+        const bushGeo = new THREE.DodecahedronGeometry(0.65, 0);
+
+        const count = 44;
+        for (let i = 0; i < count; i++) {
+          const side = i % 2 === 0 ? -1 : 1;
+          const zPos = 14 - (i / count) * state.propSpan - Math.random() * 2.2;
+          const minOffset = side > 0 ? 4.4 : 3.6;
+          const baseX = side * (minOffset + Math.random() * 11.5);
+
+          const g = new THREE.Group();
+          const kind = Math.random();
+
+          if (kind < 0.42) {
+            const scale = 0.75 + Math.random() * 0.75;
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 0.7;
+            g.add(trunk);
+
+            const mat = Math.random() > 0.5 ? pineMat1 : pineMat2;
+            const c1 = new THREE.Mesh(coneBotGeo, mat); c1.position.y = 2.1; g.add(c1);
+            const c2 = new THREE.Mesh(coneMidGeo, mat); c2.position.y = 3.5; g.add(c2);
+            const c3 = new THREE.Mesh(coneTopGeo, mat); c3.position.y = 4.7; g.add(c3);
+            g.scale.setScalar(scale);
+          } else if (kind < 0.72) {
+            const scale = 0.8 + Math.random() * 0.65;
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 1.1;
+            trunk.scale.y = 1.6;
+            g.add(trunk);
+
+            const mat = Math.random() > 0.5 ? pineMat2 : bushMat;
+            const cr1 = new THREE.Mesh(crownGeo, mat); cr1.position.set(0, 2.7, 0); g.add(cr1);
+            const cr2 = new THREE.Mesh(crownGeo, pineMat1); cr2.scale.setScalar(0.75); cr2.position.set(0.55, 2.4, 0.3); g.add(cr2);
+            g.scale.setScalar(scale);
+          } else {
+            const sx = 0.8 + Math.random() * 0.9;
+            const sy = 0.55 + Math.random() * 0.55;
+            const b1 = new THREE.Mesh(bushGeo, bushMat);
+            b1.scale.set(sx, sy, sx);
+            b1.position.y = sy * 0.42;
+            g.add(b1);
+
+            if (Math.random() > 0.4) {
+              const b2 = new THREE.Mesh(bushGeo, pineMat1);
+              b2.scale.set(sx * 0.75, sy * 0.8, sx * 0.75);
+              b2.position.set(0.55, sy * 0.35, 0.25);
+              g.add(b2);
+            }
+          }
+
+          g.rotation.y = Math.random() * Math.PI * 2;
+          g.position.set(baseX, 0, zPos);
+          natureGroup.add(g);
+          state.natureProps.push({ group: g, baseX, z: zPos });
+        }
+      }
+
+      function buildCityProps(parentGroup) {
+        const cityGroup = new THREE.Group();
+        cityGroup.visible = false;
+        parentGroup.add(cityGroup);
+        state.cityGroup = cityGroup;
+        state.cityProps = [];
+
+        const neonColors = ['#00d2ff', '#ff2a6d', '#ffb800', '#19e68c', '#b45cff'];
+        const facadeMats = neonColors.map((col) => {
+          const tex = createBuildingFacadeTexture(col);
+          return new THREE.MeshStandardMaterial({
+            map: tex,
+            roughness: 0.55,
+            metalness: 0.25,
+            emissive: new THREE.Color(0xffffff),
+            emissiveMap: tex,
+            emissiveIntensity: 0.65
+          });
+        });
+
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0x0b0e16, roughness: 0.8 });
+
+        const count = 28;
+        for (let i = 0; i < count; i++) {
+          const side = i % 2 === 0 ? -1 : 1;
+          const zPos = 14 - (i / count) * state.propSpan;
+          const w = 3.6 + Math.random() * 3.4;
+          const d = 4.2 + Math.random() * 3.8;
+          const h = 7.0 + Math.random() * 14.0;
+
+          const baseX = side * (5.2 + w * 0.5 + Math.random() * 2.2);
+          const fMat = facadeMats[i % facadeMats.length];
+
+          const geo = new THREE.BoxGeometry(w, h, d);
+          const mesh = new THREE.Mesh(geo, [fMat, fMat, roofMat, roofMat, fMat, fMat]);
+          mesh.position.y = h * 0.5;
+
+          const g = new THREE.Group();
+          g.add(mesh);
+          g.position.set(baseX, 0, zPos);
+          cityGroup.add(g);
+          state.cityProps.push({ group: g, baseX, z: zPos });
+        }
+      }
+
+      /* ---------- Фонарные столбы справа ---------- */
+
+      function buildStreetPoles(parentGroup) {
+        const poleMat = new THREE.MeshStandardMaterial({ color: 0x313846, metalness: 0.78, roughness: 0.3 });
+        const lampHeadMat = new THREE.MeshBasicMaterial({ color: 0xffe8bc });
+        const poolMat = new THREE.MeshBasicMaterial({
+          map: createStreetLightPoolTexture(),
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+
+        const poleGeo = new THREE.CylinderGeometry(0.055, 0.085, 5.6, 8);
+        const armGeo = new THREE.BoxGeometry(1.5, 0.065, 0.065);
+        const lampGeo = new THREE.BoxGeometry(0.46, 0.055, 0.18);
+        const poolGeo = new THREE.PlaneGeometry(6.8, 8.2);
+
+        state.poles = [];
+        for (let i = 0; i < 6; i++) {
+          const g = new THREE.Group();
+          const zPos = 10 - i * state.poleSpacing;
+          g.position.set(2.75, 0, zPos);
+
+          const post = new THREE.Mesh(poleGeo, poleMat); post.position.set(0, 2.8, 0); g.add(post);
+          const arm = new THREE.Mesh(armGeo, poleMat); arm.position.set(-0.70, 5.55, 0); g.add(arm);
+          const lamp = new THREE.Mesh(lampGeo, lampHeadMat); lamp.position.set(-1.28, 5.49, 0); g.add(lamp);
+
+          const pool = new THREE.Mesh(poolGeo, poolMat);
+          pool.rotation.x = -Math.PI / 2;
+          pool.position.set(-1.85, 0.015, 0);
+          g.add(pool);
+
+          parentGroup.add(g);
+          state.poles.push({ group: g, z: zPos });
+        }
+
+        state.poleLightA = new THREE.PointLight(0xffd79a, 3.6, 17, 1.4);
+        state.poleLightB = new THREE.PointLight(0xffd79a, 3.6, 17, 1.4);
+        parentGroup.add(state.poleLightA);
+        parentGroup.add(state.poleLightB);
+      }
+
+      /* ---------- Ямка ---------- */
+
+      function spawnPotholeOnRoad() {
+        if (!state.worldGroup) return;
+        if (!state.potholeTex) state.potholeTex = createPotholeTexture();
+        const mat = new THREE.MeshBasicMaterial({ map: state.potholeTex, transparent: true, depthWrite: false });
+        const size = 1.05 + Math.random() * 0.45;
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 0.85), mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.rotation.z = Math.random() * Math.PI * 2;
+        const laneX = (Math.random() > 0.5 ? 0.72 : -0.72) + (Math.random() - 0.5) * 0.25;
+        mesh.position.set(laneX, 0.025, -2.6);
+        state.worldGroup.add(mesh);
+        state.potholes.push({ mesh, baseLaneX: laneX, z: -2.6, side: laneX >= 0 ? 1 : -1, hit: false });
+      }
+
+      /* ---------- Дорога и окружение ---------- */
+
+      function createBendablePlane(width, length, segW, segL, centerX, centerZ) {
+        const geo = new THREE.PlaneGeometry(width, length, segW, segL);
+        geo.rotateX(-Math.PI / 2);
+        geo.translate(centerX, 0, centerZ);
+        const pos = geo.attributes.position;
+        const baseX = new Float32Array(pos.count);
+        for (let i = 0; i < pos.count; i++) baseX[i] = pos.getX(i);
+        return { geo, baseX };
+      }
+
+      function applyRoadBend(geo, baseX, curvature) {
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const z = pos.getZ(i);
+          pos.setX(i, baseX[i] + getRoadCurveX(z, curvature));
+        }
+        pos.needsUpdate = true;
+      }
+
+      function buildEnvironment(scene) {
+        scene.background = new THREE.Color(0x070a0e);
+        scene.fog = new THREE.FogExp2(0x101518, 0.0155);
+
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
+        state.worldGroup = worldGroup;
+
+        const roadTex = createRoadTexture();
+        state.roadTexture = roadTex;
+        const roadData = createBendablePlane(4.6, 118, 4, 64, 0, -42);
+        state.roadGeo = roadData.geo;
+        state.roadBaseX = roadData.baseX;
+        worldGroup.add(new THREE.Mesh(
+          state.roadGeo,
+          new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.36, metalness: 0.32 })
+        ));
+
+        state.grassTexLeft = createGrassTexture();
+        state.grassTexRight = createGrassTexture();
+        state.sidewalkTexLeft = createSidewalkTexture();
+        state.sidewalkTexRight = createSidewalkTexture();
+
+        state.sideLeftMat = new THREE.MeshStandardMaterial({ map: state.grassTexLeft, roughness: 0.92, metalness: 0.05 });
+        state.sideRightMat = new THREE.MeshStandardMaterial({ map: state.grassTexRight, roughness: 0.92, metalness: 0.05 });
+
+        const leftData = createBendablePlane(28, 118, 4, 48, -16.3, -42);
+        state.sideLeftGeo = leftData.geo;
+        state.sideLeftBaseX = leftData.baseX;
+        const leftPlane = new THREE.Mesh(state.sideLeftGeo, state.sideLeftMat);
+        leftPlane.position.y = -0.01;
+        worldGroup.add(leftPlane);
+
+        const rightData = createBendablePlane(28, 118, 4, 48, 16.3, -42);
+        state.sideRightGeo = rightData.geo;
+        state.sideRightBaseX = rightData.baseX;
+        const rightPlane = new THREE.Mesh(state.sideRightGeo, state.sideRightMat);
+        rightPlane.position.y = -0.01;
+        worldGroup.add(rightPlane);
+
+        const horizonBillboard = new THREE.Mesh(
+          new THREE.PlaneGeometry(130, 44),
+          new THREE.MeshBasicMaterial({
+            map: createHorizonGlowTexture(),
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false
+          })
+        );
+        horizonBillboard.position.set(0, 9.5, -80);
+        worldGroup.add(horizonBillboard);
+        state.horizonBillboard = horizonBillboard;
+
+        buildStreetPoles(worldGroup);
+        buildNatureProps(worldGroup);
+        buildCityProps(worldGroup);
+
+        scene.add(new THREE.AmbientLight(0xdce6ff, 0.55));
+        const sunLight = new THREE.DirectionalLight(0xffe7c2, 1.5);
+        sunLight.position.set(0, 10, -28);
+        scene.add(sunLight);
+
+        const rimLight = new THREE.DirectionalLight(0x9ab8ff, 0.78);
+        rimLight.position.set(-4, 8, 14);
+        scene.add(rimLight);
+
+        const tailPoint = new THREE.PointLight(0xff2266, 0.9, 5);
+        tailPoint.position.set(0, 0.8, 3.0);
+        worldGroup.add(tailPoint);
+      }
+
+      /* ---------- Датчики (гироскоп + акселерометр) ---------- */
+
+      function handleDeviceMotion(e) {
+        if (!state.sensorsActive || state.demoMode) return;
+
+        const rr = e.rotationRate;
+        if (rr) {
+          let rz = rr.alpha || 0;
+          let rx = rr.beta || 0;
+          let ry = rr.gamma || 0;
+
+          if (state.invertZ) rz = -rz;
+          if (state.invertXY) { rx = -rx; ry = -ry; }
+
+          const scale = 0.0045 * state.sensitivity;
+          if (Math.abs(rz) > 2.2) state.gyroZ = Math.max(-1, Math.min(1, state.gyroZ + rz * scale));
+          if (Math.abs(rx) > 2.5) state.gyroX = Math.max(-1, Math.min(1, state.gyroX + rx * scale));
+          if (Math.abs(ry) > 2.5) state.gyroY = Math.max(-1, Math.min(1, state.gyroY + ry * scale));
+        }
+
+        const acc = e.accelerationIncludingGravity;
+        if (acc && typeof acc.z === 'number') {
+          if (state.lastAccelZ !== null) {
+            const dz = acc.z - state.lastAccelZ;
+            const dy = (acc.y || 0) - (state.lastAccelY || 0);
+            const shock = Math.sqrt(dz * dz + dy * dy);
+            if (shock > 2.2) {
+              Car3DVisualizer.triggerBump(Math.min(shock * 0.25, 1.0));
+            }
+          }
+          state.lastAccelZ = acc.z;
+          state.lastAccelY = acc.y || 0;
+        }
+      }
+
+      /* ---------- GPS (скорость + повороты по курсу) ---------- */
+
+      function handleGpsSuccess(pos) {
+        if (!state.gpsActive || state.demoMode) return;
+
+        const c = pos.coords;
+        const now = pos.timestamp || Date.now();
+        state.gpsAccuracy = typeof c.accuracy === 'number' ? Math.round(c.accuracy) : null;
+
+        let speedMs = (typeof c.speed === 'number' && !Number.isNaN(c.speed) && c.speed >= 0) ? c.speed : null;
+        let heading = (typeof c.heading === 'number' && !Number.isNaN(c.heading) && c.heading >= 0) ? c.heading : null;
+
+        const dtSec = state.gpsPrevTime ? (now - state.gpsPrevTime) / 1000 : 0;
+
+        // Резервный расчет скорости и курса по двум точкам, если браузер/магнитола отдают null
+        if (state.gpsPrevPos && dtSec > 0.3 && dtSec < 10) {
+          const distM = haversineMeters(state.gpsPrevPos.lat, state.gpsPrevPos.lon, c.latitude, c.longitude);
+          if (speedMs === null) {
+            speedMs = distM > 1.2 ? distM / dtSec : 0;
+          }
+          if (heading === null && distM > 2.5) {
+            heading = calcBearingDeg(state.gpsPrevPos.lat, state.gpsPrevPos.lon, c.latitude, c.longitude);
+          }
+        }
+
+        const speedKmh = speedMs !== null ? speedMs * 3.6 : 0;
+        // Отсекаем мелкий дрейф GPS на месте (< 2 км/ч = 0)
+        state.targetSpeedKmh = speedKmh < 2.0 ? 0 : Math.min(300, speedKmh);
+
+        // Поворот дороги по изменению курса (heading), когда машина реально едет
+        if (heading !== null && state.gpsPrevHeading !== null && state.targetSpeedKmh > 4 && dtSec > 0.2 && dtSec < 6) {
+          const dHeading = ((heading - state.gpsPrevHeading + 540) % 360) - 180;
+          const degPerSec = dHeading / dtSec;
+          if (Math.abs(degPerSec) > 1.5) {
+            // 26 град/сек соответствует полному изгибу дороги
+            const turnNorm = Math.max(-1, Math.min(1, degPerSec / 26));
+            state.gpsZ = turnNorm;
+          }
+        }
+
+        state.gpsPrevPos = { lat: c.latitude, lon: c.longitude };
+        if (heading !== null) state.gpsPrevHeading = heading;
+        state.gpsPrevTime = now;
+
+        if (typeof state.gpsStatusCallback === 'function') {
+          state.gpsStatusCallback({ ok: true, accuracy: state.gpsAccuracy, speedKmh: Math.round(state.targetSpeedKmh) });
+        }
+      }
+
+      function handleGpsError(err) {
+        if (typeof state.gpsStatusCallback === 'function') {
+          state.gpsStatusCallback({ ok: false, reason: err.message || 'Ошибка GPS' });
+        }
+      }
+
+      /* ---------- Физика и анимация ---------- */
+
+      function updatePhysics(dt) {
+        if (state.demoMode) {
+          state.demoTime += dt;
+          state.targetSpeedKmh = Math.max(0, 75 + Math.sin(state.demoTime * 0.45) * 35);
+          state.gyroZ = Math.sin(state.demoTime * 0.72) * 0.82;
+          state.gyroX = Math.sin(state.demoTime * 0.45) * 0.45;
+          state.gyroY = Math.sin(state.demoTime * 0.6) * 0.35;
+
+          if (state.demoTime >= state.nextDemoBump) {
+            Car3DVisualizer.triggerBump(0.85);
+            state.nextDemoBump = state.demoTime + 3.2 + Math.random() * 2.2;
+          }
+        } else {
+          const decay = Math.exp(-2.6 * dt);
+          state.gyroZ *= decay;
+          state.gyroX *= decay;
+          state.gyroY *= decay;
+          if (Math.abs(state.gyroZ) < 0.002) state.gyroZ = 0;
+          if (Math.abs(state.gyroX) < 0.002) state.gyroX = 0;
+          if (Math.abs(state.gyroY) < 0.002) state.gyroY = 0;
+
+          // Плавное затухание GPS-поворота между 1 Гц обновлениями
+          state.gpsZ *= Math.exp(-1.15 * dt);
+          if (Math.abs(state.gpsZ) < 0.002) state.gpsZ = 0;
+        }
+
+        // Если включены и датчики, и GPS — гироскоп дает мгновенный отклик, GPS мягко дополняет дугу
+        const gpsWeight = state.sensorsActive ? 0.55 : 1.0;
+        const targetZ = Math.max(-1, Math.min(1, state.gyroZ + state.gpsZ * gpsWeight + state.manualZ));
+        const targetX = Math.max(-1, Math.min(1, state.gyroX + state.manualX));
+        const targetY = Math.max(-1, Math.min(1, state.gyroY + state.manualY));
+
+        const smooth = Math.min(1, dt * 5.2);
+        state.curZ += (targetZ - state.curZ) * smooth;
+        state.curX += (targetX - state.curX) * smooth;
+        state.curY += (targetY - state.curY) * smooth;
+
+        state.prevSpeedKmh = state.currentSpeedKmh;
+        state.currentSpeedKmh += (state.targetSpeedKmh - state.currentSpeedKmh) * Math.min(1, dt * 4.5);
+        const speedMs = state.currentSpeedKmh / 3.6;
+
+        const accel = (state.currentSpeedKmh - state.prevSpeedKmh) / Math.max(dt, 0.001);
+        const targetAccelPitch = Math.max(-0.05, Math.min(0.05, accel * 0.001));
+        state.accelPitch += (targetAccelPitch - state.accelPitch) * Math.min(1, dt * 6);
+
+        const isBraking = accel < -6;
+        if (state.tailLightMat && state.brakeLightGlow) {
+          state.tailLightMat.color.setHex(isBraking ? 0xff4578 : 0xe61c5d);
+          state.brakeLightGlow.scale.setScalar(isBraking ? 1.3 : 1.0);
+        }
+
+        const springK = 46;
+        const damping = 5.8;
+        const roadNoise = speedMs > 1 ? Math.sin(state.roadOffset * 20) * 0.002 * Math.min(speedMs / 25, 1) : 0;
+        const suspForce = -springK * state.suspY - damping * state.suspVel;
+        state.suspVel += suspForce * dt;
+        state.suspY += state.suspVel * dt + roadNoise;
+        state.suspY = Math.max(-0.22, Math.min(0.28, state.suspY));
+        state.suspRollKick *= Math.exp(-6.5 * dt);
+        state.camShake *= Math.exp(-8.0 * dt);
+
+        const curvature = state.curZ * 0.0046;
+        if (state.roadGeo) applyRoadBend(state.roadGeo, state.roadBaseX, curvature);
+        if (state.sideLeftGeo) applyRoadBend(state.sideLeftGeo, state.sideLeftBaseX, curvature);
+        if (state.sideRightGeo) applyRoadBend(state.sideRightGeo, state.sideRightBaseX, curvature);
+
+        if (state.horizonBillboard) {
+          state.horizonBillboard.position.x = getRoadCurveX(-80, curvature) * 0.65;
+        }
+
+        if (state.worldGroup) {
+          state.worldGroup.rotation.y = -state.curZ * 0.08;
+          state.worldGroup.rotation.x = state.curX * 0.19;
+          state.worldGroup.rotation.z = -state.curY * 0.22;
+        }
+
+        if (state.carRoot && state.carBodyGroup) {
+          state.carRoot.rotation.y = -state.curZ * 0.14;
+          state.carRoot.position.x = state.curZ * 0.28;
+
+          state.carBodyGroup.position.y = state.suspY;
+          state.carBodyGroup.rotation.x = state.accelPitch - state.suspVel * 0.04;
+          state.carBodyGroup.rotation.z = -state.curZ * 0.065 + state.suspRollKick;
+        }
+
+        for (let i = 0; i < state.wheels.length; i++) {
+          const w = state.wheels[i];
+          w.spinMesh.rotation.x -= (speedMs / w.radius) * dt;
+          if (w.isFront) w.pivot.rotation.y = -state.curZ * 0.38;
+        }
+
+        const moveDist = speedMs * dt;
+        state.roadOffset += moveDist * 0.14;
+        if (state.roadTexture) state.roadTexture.offset.y = -state.roadOffset;
+        if (state.sideLeftMat && state.sideLeftMat.map) state.sideLeftMat.map.offset.y = -state.roadOffset * 1.72;
+        if (state.sideRightMat && state.sideRightMat.map) state.sideRightMat.map.offset.y = -state.roadOffset * 1.72;
+
+        const totalSpan = state.poles.length * state.poleSpacing;
+        let nearest1 = null, nearest2 = null;
+        let d1 = Infinity, d2 = Infinity;
+
+        for (let i = 0; i < state.poles.length; i++) {
+          const p = state.poles[i];
+          p.z += moveDist;
+          if (p.z > 14) p.z -= totalSpan;
+
+          const curveX = getRoadCurveX(p.z, curvature);
+          p.group.position.set(2.75 + curveX, 0, p.z);
+          p.group.rotation.y = -getRoadTangentAngle(p.z, curvature);
+
+          const dist = Math.abs(p.z);
+          if (dist < d1) {
+            d2 = d1; nearest2 = nearest1;
+            d1 = dist; nearest1 = p;
+          } else if (dist < d2) {
+            d2 = dist; nearest2 = p;
+          }
+        }
+
+        if (nearest1 && state.poleLightA) {
+          state.poleLightA.position.set(1.5 + getRoadCurveX(nearest1.z, curvature), 4.9, nearest1.z);
+        }
+        if (nearest2 && state.poleLightB) {
+          state.poleLightB.position.set(1.5 + getRoadCurveX(nearest2.z, curvature), 4.9, nearest2.z);
+        }
+
+        const activeProps = state.envMode === 'city' ? state.cityProps : state.natureProps;
+        for (let i = 0; i < activeProps.length; i++) {
+          const item = activeProps[i];
+          item.z += moveDist;
+          if (item.z > 14) item.z -= state.propSpan;
+
+          const curveX = getRoadCurveX(item.z, curvature);
+          item.group.position.set(item.baseX + curveX, 0, item.z);
+          if (state.envMode === 'city') {
+            item.group.rotation.y = -getRoadTangentAngle(item.z, curvature);
+          }
+        }
+
+        const effectiveMove = Math.max(moveDist, dt * 8);
+        for (let i = state.potholes.length - 1; i >= 0; i--) {
+          const ph = state.potholes[i];
+          ph.z += effectiveMove;
+          ph.mesh.position.set(ph.baseLaneX + getRoadCurveX(ph.z, curvature), 0.025, ph.z);
+
+          if (!ph.hit && ph.z > 1.1) {
+            ph.hit = true;
+            state.suspVel += 0.55;
+            state.suspRollKick += ph.side * 0.05;
+          }
+
+          if (ph.z > 9) {
+            state.worldGroup.remove(ph.mesh);
+            ph.mesh.geometry.dispose();
+            ph.mesh.material.dispose();
+            state.potholes.splice(i, 1);
+          }
+        }
+
+        if (state.camera) {
+          const speedFactor = Math.min(state.currentSpeedKmh / 140, 1);
+          const shakeY = (Math.random() - 0.5) * state.camShake * 0.18;
+          const camTargetX = state.curZ * 0.55;
+          const camTargetY = 2.02 - speedFactor * 0.15 + shakeY;
+          const camTargetZ = 5.45 + speedFactor * 0.5;
+
+          state.camera.position.x += (camTargetX - state.camera.position.x) * Math.min(1, dt * 4.5);
+          state.camera.position.y += (camTargetY - state.camera.position.y) * Math.min(1, dt * 6.0);
+          state.camera.position.z += (camTargetZ - state.camera.position.z) * Math.min(1, dt * 4.0);
+
+          const targetFov = 46 + speedFactor * 7;
+          if (Math.abs(state.camera.fov - targetFov) > 0.05) {
+            state.camera.fov += (targetFov - state.camera.fov) * Math.min(1, dt * 4);
+            state.camera.updateProjectionMatrix();
+          }
+
+          state.camera.lookAt(state.curZ * 0.85, 0.85, -3.5);
+        }
+
+        if (typeof state.onTelemetry === 'function') {
+          state.onTelemetry({
+            speedKmh: Math.round(state.currentSpeedKmh),
+            zDeg: (state.curZ * 25).toFixed(0),
+            xDeg: (state.curX * 15).toFixed(0),
+            yDeg: (state.curY * 15).toFixed(0),
+            gpsAccuracy: state.gpsAccuracy
+          });
+        }
+      }
+
+      function animate(now) {
+        if (!state.running) return;
+        state.rafId = requestAnimationFrame(animate);
+        const dt = state.lastTime ? Math.min((now - state.lastTime) / 1000, 0.05) : 0.016;
+        state.lastTime = now;
+
+        updatePhysics(dt);
+        if (state.renderer && state.scene && state.camera) {
+          state.renderer.render(state.scene, state.camera);
+        }
+      }
+
+      function handleResize() {
+        if (!state.container || !state.renderer || !state.camera) return;
+        const w = state.container.clientWidth || 640;
+        const h = state.container.clientHeight || 320;
+        state.camera.aspect = w / h;
+        state.camera.updateProjectionMatrix();
+        state.renderer.setSize(w, h, false);
+      }
+
+      /* ---------- Публичный API ---------- */
+
+      const Car3DVisualizer = {
+        init(container, options = {}) {
+          if (state.initialized) this.destroy();
+
+          const el = typeof container === 'string' ? document.querySelector(container) : container;
+          if (!el) throw new Error('Car3DVisualizer: контейнер не найден');
+
+          state.container = el;
+          state.onTelemetry = options.onTelemetry || null;
+          if (options.plateText) state.plateText = options.plateText;
+          if (options.plateRegion) state.plateRegion = options.plateRegion;
+
+          const w = el.clientWidth || 640;
+          const h = el.clientHeight || 320;
+
+          const scene = new THREE.Scene();
+          const camera = new THREE.PerspectiveCamera(46, w / h, 0.1, 160);
+          camera.position.set(0, 2.02, 5.45);
+          camera.lookAt(0, 0.85, -3.5);
+
+          const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            powerPreference: 'high-performance',
+            alpha: false
+          });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+          renderer.setSize(w, h, false);
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          renderer.toneMappingExposure = 1.22;
+
+          renderer.domElement.style.width = '100%';
+          renderer.domElement.style.height = '100%';
+          renderer.domElement.style.display = 'block';
+          el.appendChild(renderer.domElement);
+
+          state.envRenderTarget = buildProceduralEnvMap(renderer);
+          scene.environment = state.envRenderTarget.texture;
+
+          state.scene = scene;
+          state.camera = camera;
+          state.renderer = renderer;
+
+          buildEnvironment(scene);
+          const car = buildCarModel();
+          state.worldGroup.add(car);
+
+          if (typeof ResizeObserver !== 'undefined') {
+            state.resizeObserver = new ResizeObserver(handleResize);
+            state.resizeObserver.observe(el);
+          } else {
+            window.addEventListener('resize', handleResize);
+          }
+
+          state.motionHandler = handleDeviceMotion;
+          state.initialized = true;
+          this.start();
+        },
+
+        setSpeed(kmh) {
+          const v = Number(kmh);
+          if (!Number.isNaN(v)) state.targetSpeedKmh = Math.max(0, Math.min(300, v));
+        },
+
+        setEnvironmentMode(mode) {
+          const next = mode === 'city' ? 'city' : 'nature';
+          state.envMode = next;
+          const isCity = next === 'city';
+
+          if (state.natureGroup) state.natureGroup.visible = !isCity;
+          if (state.cityGroup) state.cityGroup.visible = isCity;
+
+          if (state.sideLeftMat && state.sideRightMat) {
+            state.sideLeftMat.map = isCity ? state.sidewalkTexLeft : state.grassTexLeft;
+            state.sideRightMat.map = isCity ? state.sidewalkTexRight : state.grassTexRight;
+            state.sideLeftMat.roughness = isCity ? 0.55 : 0.92;
+            state.sideRightMat.roughness = isCity ? 0.55 : 0.92;
+            state.sideLeftMat.needsUpdate = true;
+            state.sideRightMat.needsUpdate = true;
+          }
+          if (state.scene && state.scene.fog) {
+            state.scene.fog.color.setHex(isCity ? 0x10131e : 0x101518);
+          }
+        },
+
+        setAxes({ z, x, y } = {}) {
+          if (typeof z === 'number') state.manualZ = Math.max(-1, Math.min(1, z));
+          if (typeof x === 'number') state.manualX = Math.max(-1, Math.min(1, x));
+          if (typeof y === 'number') state.manualY = Math.max(-1, Math.min(1, y));
+        },
+
+        triggerBump(intensity = 0.9) {
+          spawnPotholeOnRoad();
+          const k = Math.max(0.3, Math.min(1.5, intensity));
+          state.suspVel = -1.35 * k;
+          state.suspRollKick = (Math.random() > 0.5 ? 1 : -1) * 0.08 * k;
+          state.camShake = 0.85 * k;
+        },
+
+        setSensorConfig({ invertZ, invertXY, sensitivity } = {}) {
+          if (typeof invertZ === 'boolean') state.invertZ = invertZ;
+          if (typeof invertXY === 'boolean') state.invertXY = invertXY;
+          if (typeof sensitivity === 'number') state.sensitivity = sensitivity;
+        },
+
+        async enableSensors() {
+          if (typeof DeviceMotionEvent === 'undefined') {
+            return { ok: false, reason: 'Датчики не поддерживаются браузером' };
+          }
+          if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            try {
+              const res = await DeviceMotionEvent.requestPermission();
+              if (res !== 'granted') return { ok: false, reason: 'Доступ к датчикам отклонен' };
+            } catch (err) {
+              return { ok: false, reason: err.message };
+            }
+          }
+          if (!state.sensorsActive) {
+            window.addEventListener('devicemotion', state.motionHandler, { passive: true });
+            state.sensorsActive = true;
+          }
+          return { ok: true };
+        },
+
+        disableSensors() {
+          if (state.sensorsActive && state.motionHandler) {
+            window.removeEventListener('devicemotion', state.motionHandler);
+            state.sensorsActive = false;
+            state.lastAccelZ = null;
+            state.lastAccelY = null;
+          }
+        },
+
+        enableGPS(onStatus) {
+          if (!('geolocation' in navigator)) {
+            return { ok: false, reason: 'GPS не поддерживается этим браузером' };
+          }
+          if (window.location.protocol === 'file:') {
+            return { ok: false, reason: 'GPS работает только по HTTPS (например, на GitHub Pages)' };
+          }
+          state.gpsStatusCallback = onStatus || null;
+          if (!state.gpsActive) {
+            state.gpsActive = true;
+            state.gpsPrevPos = null;
+            state.gpsPrevHeading = null;
+            state.gpsPrevTime = 0;
+            state.gpsAccuracy = null;
+            state.targetSpeedKmh = 0;
+            state.gpsWatchId = navigator.geolocation.watchPosition(
+              handleGpsSuccess,
+              handleGpsError,
+              { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+            );
+          }
+          return { ok: true };
+        },
+
+        disableGPS() {
+          if (state.gpsWatchId !== null && 'geolocation' in navigator) {
+            navigator.geolocation.clearWatch(state.gpsWatchId);
+            state.gpsWatchId = null;
+          }
+          state.gpsActive = false;
+          state.gpsZ = 0;
+          state.gpsPrevPos = null;
+          state.gpsPrevHeading = null;
+          state.gpsPrevTime = 0;
+          state.gpsAccuracy = null;
+          state.gpsStatusCallback = null;
+        },
+
+        setDemoMode(enabled) {
+          state.demoMode = Boolean(enabled);
+          if (state.demoMode) {
+            state.demoTime = 0;
+            state.nextDemoBump = 1.6;
+          } else {
+            state.gyroZ = 0; state.gyroX = 0; state.gyroY = 0;
+          }
+        },
+
+        start() {
+          if (!state.initialized || state.running) return;
+          state.running = true;
+          state.lastTime = 0;
+          state.rafId = requestAnimationFrame(animate);
+        },
+
+        stop() {
+          state.running = false;
+          if (state.rafId) {
+            cancelAnimationFrame(state.rafId);
+            state.rafId = null;
+          }
+        },
+
+        destroy() {
+          this.stop();
+          this.disableSensors();
+          this.disableGPS();
+
+          if (state.resizeObserver) {
+            state.resizeObserver.disconnect();
+            state.resizeObserver = null;
+          } else {
+            window.removeEventListener('resize', handleResize);
+          }
+
+          if (state.envRenderTarget) {
+            state.envRenderTarget.dispose();
+            state.envRenderTarget = null;
+          }
+
+          [state.grassTexLeft, state.grassTexRight, state.sidewalkTexLeft, state.sidewalkTexRight, state.potholeTex]
+            .forEach((t) => { if (t) t.dispose(); });
+
+          if (state.scene) {
+            state.scene.traverse((obj) => {
+              if (obj.geometry) obj.geometry.dispose();
+              if (obj.material) {
+                const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                mats.forEach((m) => {
+                  if (m.map) m.map.dispose();
+                  if (m.emissiveMap) m.emissiveMap.dispose();
+                  m.dispose();
+                });
+              }
+            });
+          }
+
+          if (state.renderer) {
+            state.renderer.dispose();
+            if (state.renderer.domElement && state.renderer.domElement.parentNode) {
+              state.renderer.domElement.parentNode.removeChild(state.renderer.domElement);
+            }
+          }
+
+          state.scene = null;
+          state.camera = null;
+          state.renderer = null;
+          state.worldGroup = null;
+          state.carRoot = null;
+          state.carBodyGroup = null;
+          state.wheels = [];
+          state.poles = [];
+          state.natureProps = [];
+          state.cityProps = [];
+          state.potholes = [];
+          state.roadGeo = null;
+          state.sideLeftGeo = null;
+          state.sideRightGeo = null;
+          state.initialized = false;
+        }
+      };
+
+      global.Car3DVisualizer = Car3DVisualizer;
+    })(window);
+
+    /* ---------- Демо-оболочка ---------- */
+    (function () {
+      const wrap = document.getElementById('visualizer-wrap');
+      const hudSpeed = document.getElementById('hud-speed');
+      const hudZ = document.getElementById('hud-z');
+      const hudX = document.getElementById('hud-x');
+      const hudY = document.getElementById('hud-y');
+      const hudDot = document.getElementById('hud-dot');
+      const hudMode = document.getElementById('hud-mode');
+
+      const btnDemo = document.getElementById('btn-demo');
+      const btnEnv = document.getElementById('btn-env');
+      const btnEnvHud = document.getElementById('btn-env-hud');
+      const btnGps = document.getElementById('btn-gps');
+      const btnSensors = document.getElementById('btn-sensors');
+      const btnBump = document.getElementById('btn-bump');
+      const btnFs = document.getElementById('btn-fs');
+      const btnFsExit = document.getElementById('btn-fs-exit');
+      const btnInvertZ = document.getElementById('btn-invert-z');
+      const btnInvertXY = document.getElementById('btn-invert-xy');
+
+      const rngSpeed = document.getElementById('rng-speed');
+      const valSpeed = document.getElementById('val-speed');
+      const rngSteer = document.getElementById('rng-steer');
+      const valSteer = document.getElementById('val-steer');
+      const rngPitch = document.getElementById('rng-pitch');
+      const valPitch = document.getElementById('val-pitch');
+      const rngRoll = document.getElementById('rng-roll');
+      const valRoll = document.getElementById('val-roll');
+      const selSens = document.getElementById('sel-sens');
+
+      let demoOn = false;
+      let sensorsOn = false;
+      let gpsOn = false;
+      let gpsAccText = '';
+      let envMode = 'nature';
+      let invertZ = false;
+      let invertXY = false;
+
+      function updateStatusBadge() {
+        hudDot.className = 'dot';
+        if (demoOn) {
+          hudDot.classList.add('demo');
+          hudMode.textContent = 'Тест-драйв';
+        } else if (gpsOn && sensorsOn) {
+          hudDot.classList.add('active');
+          hudMode.textContent = `GPS${gpsAccText} + Датчики`;
+        } else if (gpsOn) {
+          hudDot.classList.add('gps');
+          hudMode.textContent = gpsAccText ? `GPS (${gpsAccText})` : 'GPS: поиск...';
+        } else if (sensorsOn) {
+          hudDot.classList.add('active');
+          hudMode.textContent = 'Датчики активны';
+        } else {
+          hudMode.textContent = 'Ручной режим';
+        }
+      }
+
+      function toggleEnvMode() {
+        envMode = envMode === 'nature' ? 'city' : 'nature';
+        Car3DVisualizer.setEnvironmentMode(envMode);
+        const label = envMode === 'city' ? 'Среда: Город' : 'Среда: Природа';
+        btnEnv.textContent = label;
+        btnEnvHud.textContent = label;
+        btnEnv.classList.toggle('nature', envMode === 'nature');
+        btnEnv.classList.toggle('primary', envMode === 'city');
+      }
+
+      function enterFullscreen() {
+        wrap.classList.add('fullscreen');
+        document.body.classList.add('is-fullscreen');
+        if (wrap.requestFullscreen) {
+          wrap.requestFullscreen().catch(() => {});
+        } else if (wrap.webkitRequestFullscreen) {
+          wrap.webkitRequestFullscreen();
+        }
+      }
+
+      function exitFullscreen() {
+        wrap.classList.remove('fullscreen');
+        document.body.classList.remove('is-fullscreen');
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
+
+      document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) {
+          wrap.classList.remove('fullscreen');
+          document.body.classList.remove('is-fullscreen');
+        }
+      });
+
+      Car3DVisualizer.init(wrap, {
+        onTelemetry: ({ speedKmh, zDeg, xDeg, yDeg }) => {
+          hudSpeed.textContent = speedKmh;
+          hudZ.textContent = `${zDeg}°`;
+          hudX.textContent = `${xDeg}°`;
+          hudY.textContent = `${yDeg}°`;
+        }
+      });
+      Car3DVisualizer.setSpeed(60);
+      updateStatusBadge();
+
+      btnEnv.addEventListener('click', toggleEnvMode);
+      btnEnvHud.addEventListener('click', toggleEnvMode);
+      btnFs.addEventListener('click', enterFullscreen);
+      btnFsExit.addEventListener('click', exitFullscreen);
+
+      btnGps.addEventListener('click', () => {
+        if (!gpsOn) {
+          if (demoOn) {
+            demoOn = false;
+            Car3DVisualizer.setDemoMode(false);
+            btnDemo.textContent = 'Тест-драйв: ВЫКЛ';
+            btnDemo.classList.remove('accent');
+            btnDemo.classList.add('primary');
+          }
+          const res = Car3DVisualizer.enableGPS((st) => {
+            if (st.ok) {
+              gpsAccText = st.accuracy ? `±${st.accuracy}м` : 'ОК';
+              rngSpeed.value = Math.min(180, st.speedKmh);
+              valSpeed.textContent = `${st.speedKmh} км/ч`;
+              updateStatusBadge();
+            } else {
+              gpsAccText = 'нет сигнала';
+              updateStatusBadge();
+            }
+          });
+          if (res.ok) {
+            gpsOn = true;
+            gpsAccText = '';
+            btnGps.textContent = 'GPS: ВКЛ';
+            btnGps.classList.add('gps-on');
+            rngSpeed.value = 0;
+            valSpeed.textContent = '0 км/ч';
+          } else {
+            alert(res.reason);
+          }
+        } else {
+          Car3DVisualizer.disableGPS();
+          gpsOn = false;
+          gpsAccText = '';
+          btnGps.textContent = 'GPS: ВЫКЛ';
+          btnGps.classList.remove('gps-on');
+          Car3DVisualizer.setSpeed(Number(rngSpeed.value));
+        }
+        updateStatusBadge();
+      });
+
+      btnDemo.addEventListener('click', () => {
+        demoOn = !demoOn;
+        Car3DVisualizer.setDemoMode(demoOn);
+        btnDemo.textContent = demoOn ? 'Тест-драйв: ВКЛ' : 'Тест-драйв: ВЫКЛ';
+        btnDemo.classList.toggle('accent', demoOn);
+        btnDemo.classList.toggle('primary', !demoOn);
+        if (!demoOn && !gpsOn) Car3DVisualizer.setSpeed(Number(rngSpeed.value));
+        updateStatusBadge();
+      });
+
+      btnSensors.addEventListener('click', async () => {
+        if (!sensorsOn) {
+          const res = await Car3DVisualizer.enableSensors();
+          if (res.ok) {
+            sensorsOn = true;
+            btnSensors.textContent = 'Датчики: ВКЛ';
+            btnSensors.classList.add('primary');
+          } else {
+            alert(res.reason || 'Не удалось включить датчики');
+          }
+        } else {
+          Car3DVisualizer.disableSensors();
+          sensorsOn = false;
+          btnSensors.textContent = 'Датчики: ВЫКЛ';
+          btnSensors.classList.remove('primary');
+        }
+        updateStatusBadge();
+      });
+
+      btnBump.addEventListener('click', () => Car3DVisualizer.triggerBump(1.0));
+
+      rngSpeed.addEventListener('input', () => {
+        const spd = Number(rngSpeed.value);
+        valSpeed.textContent = `${spd} км/ч`;
+        if (demoOn) {
+          demoOn = false;
+          Car3DVisualizer.setDemoMode(false);
+          btnDemo.textContent = 'Тест-драйв: ВЫКЛ';
+          btnDemo.classList.remove('accent');
+          btnDemo.classList.add('primary');
+          updateStatusBadge();
+        }
+        Car3DVisualizer.setSpeed(spd);
+      });
+
+      function bindAxisSlider(input, label, key) {
+        input.addEventListener('input', () => {
+          const v = Number(input.value);
+          label.textContent = `${v}%`;
+          Car3DVisualizer.setAxes({ [key]: v / 100 });
+        });
+        const reset = () => {
+          input.value = 0;
+          label.textContent = '0%';
+          Car3DVisualizer.setAxes({ [key]: 0 });
+        };
+        input.addEventListener('pointerup', reset);
+        input.addEventListener('touchend', reset);
+      }
+
+      bindAxisSlider(rngSteer, valSteer, 'z');
+      bindAxisSlider(rngPitch, valPitch, 'x');
+      bindAxisSlider(rngRoll, valRoll, 'y');
+
+      btnInvertZ.addEventListener('click', () => {
+        invertZ = !invertZ;
+        btnInvertZ.textContent = invertZ ? 'Инверсия Z: ВКЛ' : 'Инверсия Z: ВЫКЛ';
+        btnInvertZ.classList.toggle('primary', invertZ);
+        Car3DVisualizer.setSensorConfig({ invertZ });
+      });
+
+      btnInvertXY.addEventListener('click', () => {
+        invertXY = !invertXY;
+        btnInvertXY.textContent = invertXY ? 'Инверсия X/Y: ВКЛ' : 'Инверсия X/Y: ВЫКЛ';
+        btnInvertXY.classList.toggle('primary', invertXY);
+        Car3DVisualizer.setSensorConfig({ invertXY });
+      });
+
+      selSens.addEventListener('change', () => {
+        Car3DVisualizer.setSensorConfig({ sensitivity: Number(selSens.value) });
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) Car3DVisualizer.stop();
+        else Car3DVisualizer.start();
+      });
+    })();
+  </script>
+</body>
+</html>
